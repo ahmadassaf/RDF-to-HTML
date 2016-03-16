@@ -7,6 +7,8 @@
 */
 
 var L = require('leaflet');
+var wkx = require('wkx');
+var Util = require('n3').Util;
 
 // Main closure
 module.exports = function (db, container, prefixes, config) {
@@ -19,6 +21,7 @@ module.exports = function (db, container, prefixes, config) {
 
     // Call object functions
     addPoints(db, group);
+    addWkt(db, group);
 
     // Check if there are objects to be rendered on the map
     var geoGroup = group.toGeoJSON();
@@ -56,6 +59,28 @@ var addPoints = function (db, group) {
 		    L.marker([getLiteralValue(lat.object), getLiteralValue(data.object)]).addTo(group)
 		    .bindPopup('<a href="' + data.subject + '" target="_blank" >' + data.subject +'</a>');
 		}
+    });
+
+};
+
+// Add WKT strings on the group layer
+var addWkt = function (db, group) {
+
+    var triples = db.find(null, 'http://www.opengis.net/ont/geosparql#hasGeometry', null);
+
+    triples.forEach(function (data) {
+        var wktTriple = db.find(data.object, 'http://www.opengis.net/ont/geosparql#asWKT', null)[0];
+        if(wktTriple) {
+            var shape = wkx.Geometry.parse(Util.getLiteralValue(wktTriple.object));
+            // TODO: Support more WKT types
+            if(shape.exteriorRing) {
+                var points = shape.exteriorRing.map(function (point) {
+                    return [point.y, point.x];
+                });
+                L.polygon(points).addTo(group)
+                    .bindPopup('<a href="' + data.subject + '" target="_blank" >' + data.subject + '</a>');
+            }
+        }
     });
 
 };
